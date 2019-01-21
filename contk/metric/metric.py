@@ -46,7 +46,7 @@ class PerlplexityMetric(MetricBase):
 			data[reference_key] (list or :class:`numpy.array`): Reference sentences.
 				Contains start token (eg: ``<go>``) and end token (eg: ``<eos>``).
 				Size: `[batch_size, max_sentence_length]`
-			data[reference_key] (list): Length of Reference sentences. Contains start token (eg:``<go>``)
+			data[reference_len_key] (list): Length of Reference sentences. Contains start token (eg:``<go>``)
 				and end token (eg:``<eos>``). Size: `[batch_size]`
 			data[gen_prob_key] (list or :class:`numpy.array`): Setence generations model outputs of
 				**log softmax** probability. Contains end token (eg:``<eos>``), but without start token
@@ -78,8 +78,10 @@ class PerlplexityMetric(MetricBase):
 				if not np.allclose(expsum, [1] * single_length):
 					raise ValueError("data[gen_prob_key] must be processed after log_softmax.")
 
-			self.word_loss += -np.sum(gen_prob[i][\
-				list(range(single_length-1)), resp[i][1:single_length]])
+			# self.word_loss += -np.sum(gen_prob[i][\
+			# 	list(range(single_length-1)), resp[i][1:single_length]])
+			for x, y in zip(list(range(single_length - 1)), resp[i][1:single_length]):
+				self.word_loss += -gen_prob[i][x][y]
 			self.length_sum += single_length - 1
 
 	def close(self):
@@ -183,7 +185,8 @@ class BleuCorpusMetric(MetricBase):
 		'''
 		gen = data[self.gen_key]
 		resp = data[self.reference_key]
-		if resp.shape[0] != gen.shape[0]:
+		if len(resp) != len(gen):
+		# if resp.shape[0] != gen.shape[0]:
 			raise ValueError("Batch num is not matched.")
 
 		for gen_sen, resp_sen in zip(gen, resp):
@@ -195,7 +198,8 @@ class BleuCorpusMetric(MetricBase):
 
 			* **bleu**: bleu value.
 		'''
-		return corpus_bleu(self.refs, self.hyps, smoothing_function=SmoothingFunction.method7)
+		print("GGGGGGGGGGGGGGGGGGGGGGGGGGG")
+		return {"bleu_value": corpus_bleu(self.refs, self.hyps, smoothing_function=SmoothingFunction().method7)}
 
 class MultiTurnBleuCorpusMetric(MetricBase):
 	'''Metric for calcualting multi-turn BLEU.
@@ -251,7 +255,7 @@ class MultiTurnBleuCorpusMetric(MetricBase):
 
 			* **bleu**: bleu value.
 		'''
-		return corpus_bleu(self.refs, self.hyps, smoothing_function=SmoothingFunction.method7)
+		return {"bleu_value": corpus_bleu(self.refs, self.hyps, smoothing_function=SmoothingFunction.method7)}
 
 class SingleTurnDialogRecorder(MetricBase):
 	'''A metric-like class for recording generated sentences and references.
@@ -293,11 +297,11 @@ class SingleTurnDialogRecorder(MetricBase):
 		post = data[self.post_key]
 		resp = data[self.resp_key]
 		gen = data[self.gen_key]
-		if post.shape[0] != resp.shape[0] or resp.shape[0] != gen.shape[0]:
+		if len(post) != len(resp) or len(resp) != len(gen):
 			raise ValueError("Batch num is not matched.")
-		for i in range(post.shape[0]):
-			self.post_list.append(self.dataloader.index_to_sen(post[i, 1:]))
-			self.resp_list.append(self.dataloader.index_to_sen(resp[i, 1:]))
+		for i in range(len(post)):
+			self.post_list.append(self.dataloader.index_to_sen(post[i][1:]))
+			self.resp_list.append(self.dataloader.index_to_sen(resp[i][1:]))
 			self.gen_list.append(self.dataloader.index_to_sen(gen[i]))
 
 	def close(self):
@@ -352,7 +356,7 @@ class MultiTurnDialogRecorder(MetricBase):
 		context = data[self.context_key]
 		reference = data[self.reference_key]
 		gen = data[self.gen_key]
-		if context.shape[0] != reference.shape[0] or context.shape[0] != gen.shape[0]:
+		if len(context) != len(reference) or len(context) != len(gen):
 			raise ValueError("Batch num is not matched.")
 		for i in range(context.shape[0]):
 			self.context_list.append(self.dataloader.multi_turn_index_to_sen(context[i, :, 1:]))
@@ -392,7 +396,7 @@ class LanguageGenerationRecorder(MetricBase):
 				Size: `[batch_size, gen_sentence_length]`.
 		'''
 		gen = data[self.gen_key]
-		for i in range(gen.shape[0]):
+		for i in range(len(gen)):
 			self.gen_list.append(self.dataloader.index_to_sen(gen[i]))
 
 	def close(self):
