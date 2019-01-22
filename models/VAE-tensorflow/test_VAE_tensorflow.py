@@ -84,8 +84,8 @@ def my_args():
     args = default_args()
     args.cuda = 0
     args.name = 'test_VAE_tensorflow'
-    args.datapath = '/home/gujunru/data/share/tests/dataloader/dummy_mscoco'
-    args.wvpath = '/home/gujunru/data/share/glove.6B.300d.txt'
+    args.datapath = './tests/dataloader/dummy_mscoco'
+    args.wvpath = './glove.6B.300d.txt'
     args.wvclass = 'Glove'
     args.epochs = 5
     import os

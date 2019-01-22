@@ -198,7 +198,6 @@ class BleuCorpusMetric(MetricBase):
 
 			* **bleu**: bleu value.
 		'''
-		print("GGGGGGGGGGGGGGGGGGGGGGGGGGG")
 		return {"bleu_value": corpus_bleu(self.refs, self.hyps, smoothing_function=SmoothingFunction().method7)}
 
 class MultiTurnBleuCorpusMetric(MetricBase):
