@@ -5,7 +5,7 @@ import os.path
 import json
 
 import tensorboardX as tx
-import torch
+import numpy as np
 
 class SummaryHelper:
 	def __init__(self, filename, args=None):
@@ -44,7 +44,7 @@ class SummaryHelper:
 					for tag, value in emb.items():
 						metadata += [tag] * value.shape[0]
 						valuedata.append(value)
-					self.writer.add_embedding(torch.cat(valuedata, dim=0), \
+					self.writer.add_embedding(np.concatenate(valuedata, dim=0), \
 						metadata=metadata, global_step=i, tag="%s/%s" % (prefix, name))
 
 		return write

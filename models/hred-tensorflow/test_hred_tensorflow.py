@@ -79,35 +79,37 @@ def default_args():
 
 	return args
 
+
+
 def my_args():
+	random.seed(0)
 	args = default_args()
 	args.cuda = 0
-	args.name = 'test_hred_tensorflow'
+	args.restore = 'False'
 	args.wvclass = 'Glove'
-	args.epochs = 1
-	args.checkpoint_steps = 1
 	import os
 	cwd = os.path.abspath(os.path.dirname(__file__))
 	if not os.path.exists(cwd + '/output'):
 	    os.mkdir(cwd + '/output')
 	if not os.path.exists(cwd + '/model'):
 	    os.mkdir(cwd + '/model')
+	args.out_dir = cwd + '/output'
+	args.log_dir = cwd + '/tensorboard'
+	args.model_dir = cwd + '/model'
+	args.cache_dir = cwd + '/cache'
 	path = os.path.split(cwd)[0]
 	path = os.path.split(path)[0]
-	args.datapath = path + '/tests/dataloader/dummy_ubuntucorpus'
 	args.wvpath = path + '/tests/models/dummy_glove_300d.txt'
-	random.seed(0)
+
+	args.name = 'test_hred_tensorflow'
+	args.epochs = 1
+	args.checkpoint_steps = 1
+	args.datapath = path + '/tests/dataloader/dummy_ubuntucorpus'
 	return args
 
 def test_train():
 	args = my_args()
 	args.mode = 'train'
-	main(args)
-	tf.reset_default_graph()
-
-def test_test():
-	args = my_args()
-	args.mode = 'test'
 	main(args)
 	tf.reset_default_graph()
 
@@ -124,3 +126,11 @@ def test_cache():
 	args.cache = 1
 	main(args)
 	tf.reset_default_graph()
+
+def test_test():
+	args = my_args()
+	args.mode = 'test'
+	main(args)
+	tf.reset_default_graph()
+
+
