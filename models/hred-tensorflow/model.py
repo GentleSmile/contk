@@ -152,13 +152,21 @@ class HredModel(object):
 
 	def get_step_data(self, step_data, batched_data, turn):
 		current_batch_size = batched_data['sent'].shape[0]
-		step_data['posts'] = batched_data['sent'][:, turn, :]
+		max_turn_length = batched_data['sent'].shape[1]
+		max_sent_length = batched_data['sent'].shape[2]
+		if turn == -1:
+			step_data['posts'] = np.zeros((current_batch_size, 1), dtype=int)
+		else:
+			step_data['posts'] = batched_data['sent'][:, turn, :]
 		step_data['responses'] = batched_data['sent'][:, turn + 1, :]
 		step_data['posts_length'] = np.zeros((current_batch_size,), dtype=int)
 		step_data['responses_length'] = np.zeros((current_batch_size,), dtype=int)
 		for i in range(current_batch_size):
 			if turn < len(batched_data['sent_length'][i]):
-				step_data['posts_length'][i] = batched_data['sent_length'][i][turn]
+				if turn == -1:
+					step_data['posts_length'][i] = 1
+				else:
+					step_data['posts_length'][i] = batched_data['sent_length'][i][turn]
 			if turn + 1 < len(batched_data['sent_length'][i]):
 				step_data['responses_length'][i] = batched_data['sent_length'][i][turn + 1]
 		max_posts_length = np.max(step_data['posts_length'])
@@ -290,8 +298,8 @@ class HredModel(object):
 			context_states = np.zeros((current_batch_size, args.ch_size))
 			batched_gen_prob = []
 			batched_gen = []
-			for turn in range(max_turn_length - 1):
-				self.get_step_data(step_data, batched_data, turn)
+			for turn in range(max_turn_length):
+				self.get_step_data(step_data, batched_data, turn - 1)
 				step_data['init_states'] = context_states
 				decoder_loss, gen_prob, context_states = self.step_decoder(sess, step_data, forward_only=True)
 				batched_responses_id, context_states = self.step_decoder(sess, step_data, inference=True)
@@ -302,13 +310,13 @@ class HredModel(object):
 				batched_gen.append(step_data['generations'])
 
 			def transpose(batched_gen_prob):
-				batched_gen_prob_temp = [[0 for i in range(max_turn_length - 1)] for j in range(current_batch_size)]
-				for i in range(max_turn_length - 1):
+				batched_gen_prob_temp = [[0 for i in range(max_turn_length)] for j in range(current_batch_size)]
+				for i in range(max_turn_length):
 					for j in range(current_batch_size):
 						batched_gen_prob_temp[j][i] = batched_gen_prob[i][j]
 				batched_gen_prob[:] = batched_gen_prob_temp[:]
 				for i in range(current_batch_size):
-					for j in range(max_turn_length - 1):
+					for j in range(max_turn_length):
 						batched_gen_prob[i][j] = np.concatenate((batched_gen_prob[i][j], [batched_gen_prob[i][j][-1]]), axis=0)
 			transpose(batched_gen_prob)
 			transpose(batched_gen)
@@ -317,21 +325,24 @@ class HredModel(object):
 			for i in range(current_batch_size):
 				sent_length[i][0:len(batched_data['sent_length'][i])] = batched_data['sent_length'][i]
 			batched_sent = np.zeros((current_batch_size, max_turn_length, max_sent_length + 2), dtype=int)
+			empty_sent = np.zeros((current_batch_size, 1, max_sent_length + 2), dtype=int)
 			for i in range(current_batch_size):
 				for j in range(max_turn_length):
 					batched_sent[i][j][0] = data.go_id
 					batched_sent[i][j][1:sent_length[i][j]+1] = batched_data['sent'][i][j][0:sent_length[i][j]]
+				empty_sent[i][0][0] = data.go_id
+				empty_sent[i][0][1] = data.eos_id
 			sent_length = sent_length + 1
 			metric1_data = {
-					'sent': batched_sent[:, 1:max_turn_length],
-					'sent_length': sent_length[:, 1:max_turn_length],
-					'gen_prob': batched_gen_prob
+					'sent': batched_sent,
+					'sent_length': sent_length,
+					'gen_prob': batched_gen_prob,
 					}
 			metric1.forward(metric1_data)
 			metric2_data = {
-					'sent': batched_sent[:, 1:max_turn_length],
-					'content': batched_sent[:, 0:max_turn_length-1],
-					'reference': batched_sent[:, 1:max_turn_length],
+					'sent': batched_sent,
+					'content': np.concatenate([empty_sent, batched_sent[:, 0:max_turn_length-1, :]], axis=1),
+					'reference': batched_sent,
 					'gen': batched_gen,
 					}
 			metric2.forward(metric2_data)
