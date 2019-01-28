@@ -44,7 +44,7 @@ def modify_args(args):
 	args.cuda = False
 	args.restore = None
 	args.wvclass = 'Glove'
-	args.wvpath = path + '/tests/models/dummy_glove_300d.txt'
+	args.wvpath = path + '/tests/wordvector/dummy_glove_300d.txt'
 	args.out_dir = cwd + '/output_test'
 	args.log_dir = cwd + '/tensorboard_test'
 	args.model_dir = cwd + '/model_test'
