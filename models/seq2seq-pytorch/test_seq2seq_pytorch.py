@@ -4,7 +4,6 @@ from run import run
 from main import main
 import os
 import shutil
-import tensorflow as tf
 cwd = os.path.abspath(os.path.dirname(__file__))
 path = os.path.split(cwd)[0]
 path = os.path.split(path)[0]
@@ -50,10 +49,12 @@ def modify_args(args):
 	args.model_dir = cwd + '/model_test'
 	args.cache_dir = cwd + '/cache_test'
 
-	args.name = 'test_VAE_tensorflow'
+	args.name = 'test_seq2seq_pytorch'
 	args.wvclass = 'Glove'
-	args.epochs = 5
-	args.datapath = path + '/tests/dataloader/dummy_mscoco'
+	args.epochs = 1
+	args.batch_per_epoch = 5
+	args.batch_size = 5
+	args.datapath = path + '/tests/dataloader/dummy_opensubtitles'
 
 def test_train(mocker):
 	def side_effect_train(args):
@@ -72,13 +73,10 @@ def test_train(mocker):
 		main(args)
 	mock = mocker.patch('main.main', side_effect=side_effect_train)
 	run()
-	tf.reset_default_graph()
 	mock.side_effect = side_effect_restore
 	run()
-	tf.reset_default_graph()
 	mock.side_effect = side_effect_cache
 	run()
-	tf.reset_default_graph()
 
 def test_test(mocker):
 	def side_effect_test(args):
@@ -87,5 +85,3 @@ def test_test(mocker):
 		main(args)
 	mock = mocker.patch('main.main', side_effect=side_effect_test)
 	run()
-	tf.reset_default_graph()
-

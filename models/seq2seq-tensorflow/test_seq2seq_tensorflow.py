@@ -10,15 +10,29 @@ path = os.path.split(cwd)[0]
 path = os.path.split(path)[0]
 
 def setup_function(function):
+	import sys
+	sys.argv = ['python3']
 	random.seed(0)
-	if not os.path.exists(cwd + '/output_test'):
-	    os.mkdir(cwd + '/output_test')
-	if not os.path.exists(cwd + '/tensorboard_test'):
-	    os.mkdir(cwd + '/tensorboard_test')
-	if not os.path.exists(cwd + '/model_test'):
-	    os.mkdir(cwd + '/model_test')
-	if not os.path.exists(cwd + '/cache_test'):
-	    os.mkdir(cwd + '/cache_test')
+	try:
+		shutil.rmtree(cwd + '/output_test')
+	except Exception:
+		pass
+	try:
+		shutil.rmtree(cwd + '/tensorboard_test')
+	except Exception:
+		pass
+	try:
+		shutil.rmtree(cwd + '/model_test')
+	except Exception:
+		pass
+	try:
+		shutil.rmtree(cwd + '/cache_test')
+	except Exception:
+		pass
+	os.mkdir(cwd + '/output_test')
+	os.mkdir(cwd + '/tensorboard_test')
+	os.mkdir(cwd + '/model_test')
+	os.mkdir(cwd + '/cache_test')
 
 def teardown_function(function):
 	shutil.rmtree(cwd + '/output_test')
