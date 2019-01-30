@@ -413,7 +413,7 @@ class TestMultiTurnBleuCorpusMetric:
 		# 0, 1
 		# 0, 1
 		dataloader = FakeDataLoader()
-		reference_key, gen_key = ('sent', 'gen') \
+		reference_key, gen_key = ('reference', 'gen') \
 			if argument == 'default' else ('rk', 'gpk')
 		data = dataloader.get_data(reference_key=reference_key, gen_key=gen_key, \
 								   multi_turn=True, to_list=(type == 'list'), pad=(shape == 'pad'), \
