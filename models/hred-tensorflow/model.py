@@ -340,8 +340,7 @@ class HredModel(object):
 					}
 			metric1.forward(metric1_data)
 			metric2_data = {
-					'sent': batched_sent,
-					'content': np.concatenate([empty_sent, batched_sent[:, 0:max_turn_length-1, :]], axis=1),
+					'context': np.concatenate([empty_sent, batched_sent[:, 0:max_turn_length-1, :]], axis=1),
 					'reference': batched_sent,
 					'gen': batched_gen,
 					}
