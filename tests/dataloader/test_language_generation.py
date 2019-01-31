@@ -5,7 +5,8 @@ from pytest_mock import mocker
 
 from contk.dataloader import LanguageGeneration, MSCOCO
 from contk.metric import MetricBase
-
+from contk.dataloader import Dataloader
+from contk.dataloader import BasicLanguageGeneration
 class TestLanguageGeneration():
 	def base_test_init(self, dl):
 		assert isinstance(dl, LanguageGeneration)
@@ -38,6 +39,30 @@ class TestLanguageGeneration():
 		# assert the data has invalid token
 		assert dl.all_vocab_size > dl.vocab_size
 
+		gen = Dataloader().get_all_subclasses()
+		try:
+			for each in gen:
+				pass
+		except Exception:
+			assert 0
+		Dataloader().load_class('LanguageGeneration')
+		Dataloader().load_class('None')
+		try:
+			basic = BasicLanguageGeneration()
+		except Exception:
+			pass
+		else:
+			assert 0
+		class MyLanguageGeneration(BasicLanguageGeneration):
+			def __init__(self):
+				pass
+		try:
+			MyLanguageGeneration().get_batch(None, None)
+		except Exception:
+			pass
+		else:
+			assert 0
+
 	def base_test_all_unknown(self, dl):
 		# if invalid_vocab_times very big, there is no invalid words.
 		assert dl.vocab_size == dl.vocab_size
@@ -66,7 +91,7 @@ class TestLanguageGeneration():
 		for key in dl.key_name:
 			with pytest.raises(IndexError):
 				length = len(dl.data[key]['sen'])
-				dl.get_batch(key, [length-1, length])	
+				dl.get_batch(key, [length-1, length])
 			assert len(dl.index[key]) >= 2
 			batch = dl.get_batch(key, [0, 1])
 			assert len(batch["sentence_length"]) == 2
