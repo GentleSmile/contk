@@ -50,10 +50,12 @@ def modify_args(args):
 	args.model_dir = cwd + '/model_test'
 	args.cache_dir = cwd + '/cache_test'
 
-	args.name = 'test_VAE_tensorflow'
+	args.name = 'test_CVAE_tensorflow'
 	args.wvclass = 'Glove'
-	args.epochs = 5
-	args.datapath = path + '/tests/dataloader/dummy_mscoco'
+	args.epochs = 1
+	args.batch_per_epoch = 5
+	args.batch_size = 5
+	args.datapath = path + '/tests/dataloader/dummy_switchboardcorpus'
 
 def test_train(mocker):
 	def side_effect_train(args):
@@ -88,4 +90,3 @@ def test_test(mocker):
 	mock = mocker.patch('main.main', side_effect=side_effect_test)
 	run()
 	tf.reset_default_graph()
-
