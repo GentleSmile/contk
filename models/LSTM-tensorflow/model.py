@@ -6,10 +6,8 @@ from tensorflow.python.ops.nn import dynamic_rnn
 from tensorflow.python.layers.core import Dense
 from utils import SummaryHelper
 
-
-class VAEModel(object):
+class LSTMModel(object):
 	def __init__(self, data, args, embed):
-
 		with tf.variable_scope("input"):
 			with tf.variable_scope("embedding"):
 				# build the embedding table and embedding input
@@ -42,84 +40,36 @@ class VAEModel(object):
 		self.global_step = tf.Variable(0, trainable=False)
 
 		# build rnn_cell
-		cell_enc = tf.nn.rnn_cell.GRUCell(args.eh_size)
-		cell_dec = tf.nn.rnn_cell.GRUCell(args.dh_size)
+		cell_enc = tf.nn.rnn_cell.LSTMCell(data.vocab_size)
 
 		# build encoder
 		with tf.variable_scope('encoder'):
 			encoder_output, encoder_state = dynamic_rnn(cell_enc, self.encoder_input,
 														self.encoder_len, dtype=tf.float32, scope="encoder_rnn")
 
-		with tf.variable_scope('recognition_net'):
-			recog_input = encoder_state
-			self.recog_mu = tf.layers.dense(inputs=recog_input, units=args.z_dim, activation=None, name='recog_mu')
-			self.recog_logvar = tf.layers.dense(inputs=recog_input, units=args.z_dim, activation=None, name='recog_logvar')
 
-			epsilon = tf.random_normal(tf.shape(self.recog_logvar), name="epsilon")
-			std = tf.exp(0.5 * self.recog_logvar)
-			self.recog_z = tf.add(self.recog_mu, tf.multiply(std, epsilon), name='recog_z')
-
-			self.kld = tf.reduce_mean(
-				0.5 * tf.reduce_sum(tf.exp(self.recog_logvar) + self.recog_mu * self.recog_mu - self.recog_logvar - 1,
-									axis=-1))
-			self.prior_z = tf.random_normal(tf.shape(self.recog_logvar), name="prior_z")
-			latent_sample = tf.cond(self.use_prior,
-									lambda: self.prior_z,
-									lambda: self.recog_z,
-									name='latent_sample')
-			dec_init_state = tf.layers.dense(inputs=latent_sample, units=args.dh_size, activation=None)
-
-		with tf.variable_scope("output_layer", initializer=tf.orthogonal_initializer()):
-			self.output_layer = Dense(data.vocab_size, kernel_initializer=tf.truncated_normal_initializer(stddev=0.1),
-									  use_bias=True)
-
-		with tf.variable_scope("decode", initializer=tf.orthogonal_initializer()):
-			train_helper = tf.contrib.seq2seq.TrainingHelper(
-				inputs=self.decoder_input,
-				sequence_length=self.decoder_len
-			)
-			train_decoder = tf.contrib.seq2seq.BasicDecoder(
-				cell=cell_dec,
-				helper=train_helper,
-				initial_state=dec_init_state,
-				output_layer=self.output_layer
-			)
-			train_output, _, _ = tf.contrib.seq2seq.dynamic_decode(
-				decoder=train_decoder,
-				maximum_iterations=self.decoder_max_len,
-				impute_finished=True
-			)
-			logits = train_output.rnn_output
-
-			crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(
-				labels=self.decoder_target, logits=logits)
+		with tf.variable_scope("decode"):
+			logits = encoder_output[:, 1:, :]
+			crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=self.decoder_target)
 			crossent = tf.reduce_sum(crossent * self.decoder_mask)
 			self.sen_loss = crossent / tf.to_float(batch_size)
+
+			self.decoder_distribution_teacher = tf.nn.log_softmax(logits)
+
 			self.ppl_loss = crossent / tf.reduce_sum(self.decoder_mask)
 
 			self.decoder_distribution_teacher = tf.nn.log_softmax(logits)
 
+
 		with tf.variable_scope("decode", reuse=True):
-			infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(self.embed, tf.fill([batch_size], data.go_id),
-																	data.eos_id)
-			infer_decoder = tf.contrib.seq2seq.BasicDecoder(
-				cell=cell_dec,
-				helper=infer_helper,
-				initial_state=dec_init_state,
-				output_layer=self.output_layer
-			)
-			infer_output, _, _ = tf.contrib.seq2seq.dynamic_decode(
-				decoder=infer_decoder,
-				maximum_iterations=self.decoder_max_len,
-				impute_finished=True
-			)
-			self.decoder_distribution = infer_output.rnn_output
+			self.decoder_distribution = encoder_output # tf.zeros((batch_size, batch_len, data.vocab_size))
 			self.generation_index = tf.argmax(tf.split(self.decoder_distribution,
 													   [2, data.vocab_size - 2], 2)[1], 2) + 2  # for removing UNK
 
-		self.kl_weights = tf.minimum(tf.to_float(self.global_step) / args.full_kl_step, 1.0)
-		self.kl_loss = self.kl_weights * tf.maximum(self.kld, args.min_kl)
-		self.loss = self.sen_loss + self.kl_loss
+		self.kl_loss = tf.zeros((1,))
+		self.kld = tf.zeros((1,))
+		self.kl_weights = tf.zeros((1,))
+		self.loss = self.sen_loss
 
 		# calculate the gradient of parameters and update
 		self.params = [k for k in tf.trainable_variables() if args.name in k.name]

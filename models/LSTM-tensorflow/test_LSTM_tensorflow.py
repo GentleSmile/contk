@@ -13,6 +13,9 @@ def setup_function(function):
 	import sys
 	sys.argv = ['python3']
 	random.seed(0)
+	import numpy as np
+	np.random.seed(0)
+	tf.set_random_seed(0)
 	try:
 		shutil.rmtree(cwd + '/output_test')
 	except Exception:
@@ -50,7 +53,7 @@ def modify_args(args):
 	args.model_dir = cwd + '/model_test'
 	args.cache_dir = cwd + '/cache_test'
 
-	args.name = 'test_VAE_tensorflow'
+	args.name = 'test_LSTM_tensorflow'
 	args.wvclass = 'Glove'
 	args.epochs = 5
 	args.datapath = path + '/tests/dataloader/dummy_mscoco'

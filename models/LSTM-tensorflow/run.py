@@ -6,10 +6,10 @@ def run():
 
 	from utils import Storage
 
-	parser = argparse.ArgumentParser(description='A VAE language generation model')
+	parser = argparse.ArgumentParser(description='A LSTM language generation model')
 	args = Storage()
 
-	parser.add_argument('--name', type=str, default='VAE',
+	parser.add_argument('--name', type=str, default='LSTM',
 		help='The name of your model, used for variable scope and tensorboard, etc. Default: runXXXXXX_XXXXXX (initialized by current time)')
 	parser.add_argument('--restore', type=str, default='last',
 		help='Checkpoints name to load. "last" for last checkpoints, "best" for best checkpoints on dev. Attention: "last" and "best" wiil cause unexpected behaviour when run 2 models in the same dir at the same time. Default: None (don\'t load anything)')

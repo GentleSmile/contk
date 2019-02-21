@@ -6,11 +6,11 @@ from contk.dataloader import LanguageGeneration
 from contk.wordvector import WordVector, Glove
 from utils import debug, try_cache
 
-from model import VAEModel
+from model import LSTMModel
 
 def create_model(sess, data, args, embed):
 	with tf.variable_scope(args.name):
-		model = VAEModel(data, args, embed)
+		model = LSTMModel(data, args, embed)
 		model.print_parameters()
 		latest_dir = '%s/checkpoint_latest' % args.model_dir
 		best_dir = '%s/checkpoint_best' % args.model_dir
