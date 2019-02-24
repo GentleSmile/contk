@@ -39,29 +39,27 @@ class TestLanguageGeneration():
 		# assert the data has invalid token
 		assert dl.all_vocab_size > dl.vocab_size
 
-		gen = Dataloader().get_all_subclasses()
+
 		try:
+			gen = Dataloader().get_all_subclasses()
 			for each in gen:
 				pass
+			Dataloader().load_class('LanguageGeneration')
+			Dataloader().load_class('None')
 		except Exception:
 			assert 0
-		Dataloader().load_class('LanguageGeneration')
-		Dataloader().load_class('None')
-		try:
+
+		with pytest.raises(NotImplementedError):
 			basic = BasicLanguageGeneration()
-		except Exception:
-			pass
-		else:
-			assert 0
-		class MyLanguageGeneration(BasicLanguageGeneration):
-			def __init__(self):
-				pass
-		try:
+
+
+
+		with pytest.raises(NotImplementedError):
+			class MyLanguageGeneration(BasicLanguageGeneration):
+				def __init__(self):
+					pass
 			MyLanguageGeneration().get_batch(None, None)
-		except Exception:
-			pass
-		else:
-			assert 0
+
 
 	def base_test_all_unknown(self, dl):
 		# if invalid_vocab_times very big, there is no invalid words.
