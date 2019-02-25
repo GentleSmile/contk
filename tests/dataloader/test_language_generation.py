@@ -40,14 +40,13 @@ class TestLanguageGeneration():
 		assert dl.all_vocab_size > dl.vocab_size
 
 
-		try:
-			gen = Dataloader().get_all_subclasses()
-			for each in gen:
-				pass
-			Dataloader().load_class('LanguageGeneration')
-			Dataloader().load_class('None')
-		except Exception:
-			assert 0
+
+		gen = Dataloader().get_all_subclasses()
+		for each in gen:
+			pass
+		Dataloader().load_class('LanguageGeneration')
+		Dataloader().load_class('None')
+
 
 		with pytest.raises(NotImplementedError):
 			basic = BasicLanguageGeneration()
