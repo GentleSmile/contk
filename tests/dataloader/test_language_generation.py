@@ -4,16 +4,22 @@ import pytest
 from pytest_mock import mocker
 
 from contk.dataloader import LanguageGeneration, MSCOCO
-from contk.metric import MetricBase
+from contk.metric import MetricBase, HashValueRecorder
 from contk.dataloader import Dataloader
 from contk.dataloader import BasicLanguageGeneration
+
+def setup_module():
+	import random
+	random.seed(0)
+	import numpy as np
+	np.random.seed(0)
+
 class TestLanguageGeneration():
 	def base_test_init(self, dl):
 		assert isinstance(dl, LanguageGeneration)
 		assert isinstance(dl.ext_vocab, list)
 		assert dl.ext_vocab[:4] == ["<pad>", "<unk>", "<go>", "<eos>"]
 		assert [dl.pad_id, dl.unk_id, dl.go_id, dl.eos_id] == [0, 1, 2, 3]
-		assert dl.eos_id == dl.end_token
 		assert isinstance(dl.key_name, list)
 		assert dl.key_name
 		for word in dl.key_name:
@@ -95,10 +101,10 @@ class TestLanguageGeneration():
 			assert len(batch["sentence_length"]) == 2
 			assert batch["sentence"].shape[0] == 2
 			if batch["sentence_length"][0] < batch['sentence'].shape[1]:
-				assert batch["sentence"][0][batch["sentence_length"][0]-1] == dl.end_token
+				assert batch["sentence"][0][batch["sentence_length"][0]-1] == dl.eos_id
 			assert batch["sentence"][0][0] == dl.go_id
 			if batch["sentence_length"][1] < batch['sentence'].shape[1]:
-				assert batch["sentence"][1][batch["sentence_length"][1]-1] == dl.end_token
+				assert batch["sentence"][1][batch["sentence_length"][1]-1] == dl.eos_id
 			assert batch["sentence"][1][0] == dl.go_id
 
 		# this is true, only when there is no unknown words in dl
@@ -191,6 +197,29 @@ class TestLanguageGeneration():
 	def base_test_multi_runs(self, dl_list):
 		assert all(x.vocab_list == dl_list[0].vocab_list for x in dl_list)
 
+	def base_test_hash(self, dl):
+		recorder1 = HashValueRecorder()
+		recorder2 = HashValueRecorder()
+		
+		for key in dl.key_name:
+			dl.restart(key, 7)
+			recorder1 = HashValueRecorder()
+			while True:
+				batch = dl.get_next_batch(key, needhash=True)
+				if not batch:
+					break
+				recorder1.forward(batch)
+
+			dl.restart(key, 7)
+			recorder2 = HashValueRecorder()
+			while True:
+				batch = dl.get_next_batch(key, needhash=True)
+				if not batch:
+					break
+				recorder2.forward(batch)
+
+			assert recorder1.close()['hashvalue'] == recorder2.close()['hashvalue'] 
+
 @pytest.fixture
 def load_mscoco():
 	def _load_mscoco(invalid_vocab_times=0):
@@ -227,3 +256,7 @@ class TestMSCOCO(TestLanguageGeneration):
 
 	def test_init_multi_runs(self, load_mscoco):
 		super().base_test_multi_runs([load_mscoco() for i in range(3)])
+
+	@pytest.mark.dependency(depends=["TestMSCOCO::test_init"])
+	def test_hash(self, load_mscoco):
+		super().base_test_hash(load_mscoco())
