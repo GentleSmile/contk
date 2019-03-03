@@ -61,7 +61,6 @@ def run():
 
 	args.softmax_samples = 512
 	args.embedding_size = 300
-	args.eh_size = 200
 	args.dh_size = 200
 	args.z_dim = 100
 	args.min_kl = 10

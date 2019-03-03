@@ -113,29 +113,24 @@ Execute ``python run.py --mode test --restore last``
 The following output will be in `./output/[name]_test.txt`:
 
 ```
-perplexity:     7.292317
-Fancy decorated bathroom with a toilet , sink , and shower .
-A close-up of a plate with a sandwich in the middle .
-Two giraffe stand together eating some leaves .
-A street sign is displayed on the sidewalk .
-A city street with cars and buses driving down it .
-A painting with a clock tower in the middle of a city .
-A man sitting at a table eating food .
-A small airplane flying in the sky .
-Two children in a field playing with a frisbee .
-A train with graffiti on the side of it .
-A woman walking in front of a bus .
-A man is riding a wave with the ocean .
-A television that is in the middle of a room .
-Man in white shirt with tennis racket in hand .
-The young girl is riding a horse through the water .
-A man is holding the neck up as he holds his hands .
-A glass vase filled with flowers in a room .
-A man driving a motorcycle with a dog .
-People are riding skis down a snowy slope .
-A piece of cake is on a plate with a fork .
-A persons hands holding up a cell phone in their hands .
-A white and red plane is flying in the sky .
+perplexity:	1.005377
+This A black Old motorcycle parked in front of a garage .
+This An office holder with four different types of computers .
+This Two women waiting at a bench next to a street .
+This A tan toilet and sink holder in a small room .
+This A beautiful dessert waiting to be is by two people .
+This A woman sitting on a bench in the middle of the city .
+This A cat eating a bird it has holder .
+This A shot of an elderly man inside a kitchen .
+This A woman sitting on a bench and a woman standing behind the bench at a bus stop .
+This An old man is wearing an odd hat .
+This A man sleeping with his cat next to him .
+This An office with desk computer and chair and laptop .
+This Two white toilet with a faucet and holder .
+This A woman and another woman waiting at a stop .
+This Close up of a white kitchen , with a coffee is on counter .
+This A white stove and cabinet inside a kitchen .
+This A cat stands between two parked cars on a grassy sidewalk .
 ...
 ```
 
@@ -149,7 +144,7 @@ A white and red plane is flying in the sky .
 
 |        | Reconstruction Perplexity |
 | ------ | ------------------------- |
-| MSCOCO | 7.29                      |
+| MSCOCO | 1.01                      |
 
 
 

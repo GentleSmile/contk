@@ -25,8 +25,8 @@ class LMModel(object):
 			batch_size, batch_len = tf.shape(self.sentence)[0], tf.shape(self.sentence)[1]
 			self.decoder_max_len = batch_len - 1
 
-			self.encoder_input = tf.nn.embedding_lookup(self.embed, self.sentence)  # batch*len*unit
-			self.encoder_len = self.sentence_length
+			self.pre_decoder_input = tf.nn.embedding_lookup(self.embed, self.sentence)  # batch*len*unit
+			self.pre_decoder_len = self.sentence_length
 
 			decoder_input = tf.split(self.sentence, [self.decoder_max_len, 1], 1)[0]  # no eos_id
 			self.decoder_input = tf.nn.embedding_lookup(self.embed, decoder_input)  # batch*(len-1)*unit
@@ -40,16 +40,20 @@ class LMModel(object):
 		self.global_step = tf.Variable(0, trainable=False)
 
 		# build rnn_cell
-		cell_enc = tf.nn.rnn_cell.LSTMCell(data.vocab_size)
+		cell_enc = tf.nn.rnn_cell.LSTMCell(args.dh_size)
+
+		# build pre_decoder
+		with tf.variable_scope('pre_decoder'):
+			pre_decoder_output, pre_decoder_state = dynamic_rnn(cell_enc, self.pre_decoder_input,
+														self.pre_decoder_len, dtype=tf.float32, scope="pre_decoder_rnn")
+
+		pre_decoder_output = tf.layers.dense(inputs=pre_decoder_output, units=data.vocab_size)
 
 
-		# build encoder
-		with tf.variable_scope('encoder'):
-			encoder_output, encoder_state = dynamic_rnn(cell_enc, self.encoder_input,
-														self.encoder_len, dtype=tf.float32, scope="encoder_rnn")
+		with tf.variable_scope("decode", initializer=tf.orthogonal_initializer()):
 
-		with tf.variable_scope("decode"):
-			logits = encoder_output[:, 1:, :]
+			logits = pre_decoder_output[:, 1:, :]
+
 			crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=self.decoder_target)
 			crossent = tf.reduce_sum(crossent * self.decoder_mask)
 			self.sen_loss = crossent / tf.to_float(batch_size)
@@ -63,13 +67,9 @@ class LMModel(object):
 
 
 		with tf.variable_scope("decode", reuse=True):
-			self.decoder_distribution = encoder_output # tf.zeros((batch_size, batch_len, data.vocab_size))
+			self.decoder_distribution = pre_decoder_output # batch_size * batch_len * data.vocab_size
 			self.generation_index = tf.argmax(tf.split(self.decoder_distribution,
 													   [2, data.vocab_size - 2], 2)[1], 2) + 2  # for removing UNK
-
-		print_op1 = tf.print('A', self.generation_index, '\nB', self.decoder_distribution)
-		with tf.control_dependencies([print_op1]):
-			self.generation_index = tf.identity(self.generation_index)
 
 		self.kl_loss = tf.zeros((1,))
 		self.kld = tf.zeros((1,))
