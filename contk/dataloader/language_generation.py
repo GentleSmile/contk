@@ -4,61 +4,56 @@ from itertools import chain
 
 import numpy as np
 
+from .._utils.unordered_hash import UnorderedSha256
+from .._utils.file_utils import get_resource_file_path
 from .dataloader import BasicLanguageGeneration
-from ..metric import MetricChain, PerlplexityMetric, LanguageGenerationRecorder
+from ..metric import MetricChain, PerplexityMetric, LanguageGenerationRecorder, \
+	HashValueRecorder
 
 # pylint: disable=W0223
 class LanguageGeneration(BasicLanguageGeneration):
-	r"""Base class for language generation datasets. This is an abstract class.
+	r"""Base class for language modelling datasets. This is an abstract class.
 
-	Arguments:
-			end_token (int): the special token that stands for end. default: `3("<eos>")`
-			ext_vocab (list): special tokens. default: `["<pad>", "<unk>", "<go>", "<eos>"]`
-			key_name (list): name of subsets of the data. default: `["train", "dev", "test"]`
+	Arguments:{ARGUMENTS}
 
-	Attributes:
-			ext_vocab (list): special tokens, be placed at beginning of `vocab_list`.
-					For example: `["<pad>", "<unk>", "<go>", "<eos>"]`
-			pad_id (int): token for padding, always equal to `0`
-			unk_id (int): token for unknown words, always equal to `1`
-			go_id (int): token at the beginning of sentences, always equal to `2`
-			eos_id (int): token at the end of sentences, always equal to `3`
-			key_name (list): name of subsets of the data. For example: `["train", "dev", "test"]`
-			all_vocab_list (list): vocabulary list of the datasets, including valid words and invalid words.
-			word2id (dict): a dict mapping tokens to index.
-					Maybe you want to use :meth:`sen_to_index` instead.
-			end_token (int): token for end. default: equals to `eos_id`
+	Attributes:{ATTRIBUTES}
 	"""
 
-	def get_batch(self, key, index):
+	ARGUMENTS = BasicLanguageGeneration.ARGUMENTS
+	ATTRIBUTES = BasicLanguageGeneration.ATTRIBUTES
+
+	def get_batch(self, key, index, needhash=False):
 		'''Get a batch of specified `index`.
 
 		Arguments:
 			key (str): must be contained in `key_name`
 			index (list): a list of specified index
+			needhash (bool): whether to return a hashvalue
+				representing this batch of data. Default: False.
 
 		Returns:
 			(dict): A dict at least contains:
 
-				* sentence_length(list): A 1-d list, the length of sentence in each batch.
+				* sent_length(list): A 1-d list, the length of sentence in each batch.
 				  Size: `[batch_size]`
-				* sentence(:class:`numpy.array`): A 2-d padding array containing id of words.
+				* sent(:class:`numpy.array`): A 2-d padding array containing id of words.
 				  Only provide valid words. `unk_id` will be used if a word is not valid.
 				  Size: `[batch_size, max(sent_length)]`
-				* sentence_allwords(:class:`numpy.array`): A 2-d padding array containing id of words.
+				* sent_allvocabs(:class:`numpy.array`): A 2-d padding array containing id of words.
 				  Provide both valid and invalid words.
 				  Size: `[batch_size, max(sent_length)]`
+				* hashvalue(bytes): (If `needhash` is True.) A bytes representing hash value of the data.
 
 		Examples:
 			>>> # vocab_list = ["<pad>", "<unk>", "<go>", "<eos>", "how", "are", "you",
 			>>> #	"hello", "i", "am", "fine"]
 			>>> dataloader.get_batch('train', [0, 1])
 			{
-				"sentence": [
+				"sent": [
 						[2, 4, 5, 6, 3],   # first sentence: <go> how are you <eos>
 						[2, 7, 3, 0, 0],   # second sentence:  <go> hello <eos> <pad> <pad>
 					],
-					"sentence_length": [5, 3], # length of sentences
+				"sent_length": [5, 3], # length of sentences
 			}
 
 		Todo:
@@ -69,32 +64,42 @@ class LanguageGeneration(BasicLanguageGeneration):
 			raise ValueError("No set named %s." % key)
 		res = {}
 		batch_size = len(index)
-		res["sentence_length"] = np.array( \
-			list(map(lambda i: len(self.data[key]['sen'][i]), index)))
-		res_sent = res["sentence"] = np.zeros( \
-			(batch_size, np.max(res["sentence_length"])), dtype=int)
+		res["sent_length"] = np.array( \
+			list(map(lambda i: len(self.data[key]['sent'][i]), index)))
+		res_sent = res["sent"] = np.zeros( \
+			(batch_size, np.max(res["sent_length"])), dtype=int)
 		for i, j in enumerate(index):
-			sentence = self.data[key]['sen'][j]
-			res["sentence"][i, :len(sentence)] = sentence
+			sentence = self.data[key]['sent'][j]
+			res["sent"][i, :len(sentence)] = sentence
 
-		res["sentence_allwords"] = res_sent.copy()
+		if needhash:
+			unordered_hash = UnorderedSha256()
+			for j in index:
+				unordered_hash.update_data(repr((self.data[key]['sent'][j], self.valid_vocab_len)).encode())
+			res["hashvalue"] = unordered_hash.digest()
+			# hashvalue must be unique for representing the whole batch
+
+		res["sent_allvocabs"] = res_sent.copy()
 		res_sent[res_sent >= self.valid_vocab_len] = self.unk_id
 		return res
 
-	def get_teacher_forcing_metric(self, gen_prob_key="gen_prob"):
+	def get_teacher_forcing_metric(self, gen_log_prob_key="gen_log_prob"):
 		'''Get metric for teacher-forcing mode.
 
 		It contains:
 
-		* :class:`.metric.PerlplexityMetric`
+		* :class:`.metric.PerplexityMetric`
 
 		Arguments:
-				gen_prob_key (str): default: `gen_prob`. Refer to :class:`.metric.PerlplexityMetric`
+				gen_prob_key (str): default: `gen_prob`. Refer to :class:`.metric.PerplexityMetric`
 		'''
-		return PerlplexityMetric(self, \
-								 reference_key='sentence', \
-								 reference_len_key='sentence_length', \
-								 gen_prob_key=gen_prob_key)
+		metric = MetricChain()
+		metric.add_metric(HashValueRecorder(hash_key="teacher_forcing_hashvalue"))
+		metric.add_metric(PerplexityMetric(self, \
+					reference_allvocabs_key='sent_allvocabs', \
+					reference_len_key='sent_length', \
+					gen_log_prob_key=gen_log_prob_key))
+		return metric
 
 	def get_inference_metric(self, gen_key="gen"):
 		'''Get metric for inference.
@@ -107,6 +112,7 @@ class LanguageGeneration(BasicLanguageGeneration):
 				gen_key (str): default: "gen". Refer to :class:`.metric.LanguageGenerationRecorder`
 		'''
 		metric = MetricChain()
+		metric.add_metric(HashValueRecorder(hash_key="inference_hashvalue"))
 		metric.add_metric(LanguageGenerationRecorder(self, \
 													 gen_key=gen_key))
 		return metric
@@ -116,7 +122,8 @@ class MSCOCO(LanguageGeneration):
 	'''A dataloder for preprocessed MSCOCO dataset.
 
 	Arguments:
-			file_path (str): a str indicates the dir of MSCOCO dataset.
+			file_id (str): a str indicates the source of MSCOCO dataset.
+			file_type (str): a str indicates the type of MSCOCO dataset. Default: "MSCOCO"
 			valid_vocab_times (int): A cut-off threshold of valid tokens. All tokens appear
 					not less than `min_vocab_times` in **training set** will be marked as valid words.
 					Default: 10.
@@ -136,8 +143,11 @@ class MSCOCO(LanguageGeneration):
 
 	'''
 
-	def __init__(self, file_path, min_vocab_times=10, max_sen_length=50, invalid_vocab_times=0):
-		self._file_path = file_path
+	def __init__(self, file_id, file_type="MSCOCO", min_vocab_times=10, \
+			max_sen_length=50, invalid_vocab_times=0):
+		self._file_id = file_id
+		self._file_path = get_resource_file_path(file_id, file_type)
+		self._file_type = file_type
 		self._min_vocab_times = min_vocab_times
 		self._max_sen_length = max_sen_length
 		self._invalid_vocab_times = invalid_vocab_times
@@ -150,10 +160,10 @@ class MSCOCO(LanguageGeneration):
 		for key in self.key_name:
 			f_file = open("%s/mscoco_%s.txt" % (self._file_path, key))
 			origin_data[key] = {}
-			origin_data[key]['sen'] = list( \
+			origin_data[key]['sent'] = list( \
 				map(lambda line: line.split(), f_file.readlines()))
 
-		raw_vocab_list = list(chain(*(origin_data['train']['sen'])))
+		raw_vocab_list = list(chain(*(origin_data['train']['sent'])))
 		# Important: Sort the words preventing the index changes between
 		# different runs
 		vocab = sorted(Counter(raw_vocab_list).most_common(), \
@@ -169,7 +179,7 @@ class MSCOCO(LanguageGeneration):
 		for key in self.key_name:
 			if key == 'train':
 				continue
-			raw_vocab_list.extend(list(chain(*(origin_data[key]['sen']))))
+			raw_vocab_list.extend(list(chain(*(origin_data[key]['sent']))))
 		vocab = sorted(Counter(raw_vocab_list).most_common(), \
 					   key=lambda pair: (-pair[1], pair[0]))
 		left_vocab = list( \
@@ -191,10 +201,10 @@ class MSCOCO(LanguageGeneration):
 		data_size = {}
 		for key in self.key_name:
 			data[key] = {}
-			data[key]['sen'] = list(map(line2id, origin_data[key]['sen']))
-			data_size[key] = len(data[key]['sen'])
+			data[key]['sent'] = list(map(line2id, origin_data[key]['sent']))
+			data_size[key] = len(data[key]['sent'])
 
-			vocab = list(chain(*(origin_data[key]['sen'])))
+			vocab = list(chain(*(origin_data[key]['sent'])))
 			vocab_num = len(vocab)
 			oov_num = len( \
 				list( \
@@ -207,7 +217,7 @@ class MSCOCO(LanguageGeneration):
 						lambda word: word not in valid_vocab_set, \
 						vocab))) - oov_num
 			length = list( \
-				map(len, origin_data[key]['sen']))
+				map(len, origin_data[key]['sent']))
 			cut_num = np.sum( \
 				np.maximum( \
 					np.array(length) - \

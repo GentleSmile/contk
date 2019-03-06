@@ -13,6 +13,9 @@ def setup_function(function):
 	import sys
 	sys.argv = ['python3']
 	random.seed(0)
+	import numpy as np
+	np.random.seed(0)
+	tf.set_random_seed(0)
 	try:
 		shutil.rmtree(cwd + '/output_test')
 	except Exception:
@@ -44,7 +47,7 @@ def modify_args(args):
 	args.cuda = False
 	args.restore = None
 	args.wvclass = 'Glove'
-	args.wvpath = path + '/tests/wordvector/dummy_glove_300d.txt'
+	args.wvpath = path + '/tests/wordvector/dummy_glove_'
 	args.out_dir = cwd + '/output_test'
 	args.log_dir = cwd + '/tensorboard_test'
 	args.model_dir = cwd + '/model_test'
@@ -57,6 +60,7 @@ def modify_args(args):
 	args.batch_size = 5
 	args.datapath = path + '/tests/dataloader/dummy_switchboardcorpus'
 
+@pytest.mark.skip()
 def test_train(mocker):
 	def side_effect_train(args):
 		modify_args(args)
@@ -82,6 +86,7 @@ def test_train(mocker):
 	run()
 	tf.reset_default_graph()
 
+@pytest.mark.skip()
 def test_test(mocker):
 	def side_effect_test(args):
 		modify_args(args)
