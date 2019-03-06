@@ -23,8 +23,8 @@ def run():
 		help="Epoch for trainning. Default: 10")
 	parser.add_argument('--wvclass', type=str, default=None,
 		help="Wordvector class, None for using Glove pretrained wordvec. Default: None")
-	parser.add_argument('--wvpath', type=str, default='wordvec',
-		help="Path for pretrained wordvector. Default: wordvec")
+	parser.add_argument('--wvpath', type=str, default=None,
+		help="Path for pretrained wordvector. Default: None")
 
 	parser.add_argument('--out_dir', type=str, default="./output",
 		help='Output directory for test output. Default: ./output')
