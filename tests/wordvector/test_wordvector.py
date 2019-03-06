@@ -8,6 +8,12 @@ from contk.wordvector.wordvector import WordVector
 from contk.wordvector.gloves import Glove
 import logging
 
+def setup_module():
+	import random
+	random.seed(0)
+	import numpy as np
+	np.random.seed(0)
+
 class TestWordVector():
 	def base_test_init(self, dl):
 		assert isinstance(dl, WordVector)
@@ -37,7 +43,7 @@ class TestWordVector():
 @pytest.fixture
 def load_glove():
 	def _load_glove():
-		return Glove("./tests/wordvector/dummy_glove_300d.txt")
+		return Glove("./tests/wordvector/dummy_glove_")
 	return _load_glove
 
 class TestGlove(TestWordVector):
