@@ -9,7 +9,7 @@ An implementation of LM(language model).
 ### Require Packages
 
 - contk
-- TensorFlow == 1.12
+- TensorFlow == 1.13
 - TensorBoardX >= 1.4
 
 

@@ -71,9 +71,6 @@ class LMModel(object):
 			self.generation_index = tf.argmax(tf.split(self.decoder_distribution,
 													   [2, data.vocab_size - 2], 2)[1], 2) + 2  # for removing UNK
 
-		self.kl_loss = tf.zeros((1,))
-		self.kld = tf.zeros((1,))
-		self.kl_weights = tf.zeros((1,))
 		self.loss = self.sen_loss
 
 		# calculate the gradient of parameters and update
@@ -107,12 +104,10 @@ class LMModel(object):
 
 		self.trainSummary = self.summaryHelper.addGroup(scalar=["loss",
 																"perplexity",
-																"kl_loss",
-																"kld",
-																"kl_weight"],
+																],
 														prefix="train")
 
-		scalarlist = ["loss", "perplexity", "kl_loss", "kld", "kl_weight"]
+		scalarlist = ["loss", "perplexity"]
 		tensorlist = []
 		textlist = []
 		for i in args.show_sample:
@@ -127,64 +122,51 @@ class LMModel(object):
 			print('%s: %s' % (item.name, item.get_shape()))
 
 	def step_decoder(self, session, data, forward_only=False):
-		input_feed = {self.sentence: data['sentence'],
-					  self.sentence_length: data['sentence_length'],
+		input_feed = {self.sentence: data['sent'],
+					  self.sentence_length: data['sent_length'],
 					  self.use_prior: False}
 		if forward_only:
 			output_feed = [self.loss,
 						   self.decoder_distribution_teacher,
-						   self.ppl_loss,
-						   self.kl_loss,
-						   self.kld,
-						   self.kl_weights]
+						   self.ppl_loss
+						  ]
 		else:
 			output_feed = [self.loss,
 						   self.gradient_norm,
 						   self.update,
-						   self.ppl_loss,
-						   self.kl_loss,
-						   self.kld,
-						   self.kl_weights
+						   self.ppl_loss
 						   ]
 		return session.run(output_feed, input_feed)
 
 	def inference(self, session, data):
-		input_feed = {self.sentence: data['sentence'],
-					  self.sentence_length: data['sentence_length'],
-					  self.use_prior: True}
+		input_feed = {self.sentence: data['sent'],
+					  self.sentence_length: data['sent_length']
+					 }
 		output_feed = [self.generation_index]
 		return session.run(output_feed, input_feed)
 
 	def evaluate(self, sess, data, batch_size, key_name):
 		loss_step = np.zeros((1,))
-		ppl_loss_step, kl_loss_step, kld_step, kl_weight_step = 0, 0, 0, 0
+		ppl_loss_step = 0
 		times = 0
 		data.restart(key_name, batch_size=batch_size, shuffle=False)
 		batched_data = data.get_next_batch(key_name)
 		while batched_data != None:
 			outputs = self.step_decoder(sess, batched_data, forward_only=True)
 			loss_step += outputs[0]
-			ppl_loss_step += outputs[-4]
-			kl_loss_step += outputs[-3]
-			kld_step += outputs[-2]
-			kl_weight_step = outputs[-1]
+			ppl_loss_step += outputs[-1]
 			times += 1
 			batched_data = data.get_next_batch(key_name)
 
 		loss_step /= times
 		ppl_loss_step /= times
-		kl_loss_step /= times
-		kld_step /= times
 
 		print('    loss: %.2f' % loss_step)
-		print('    kl_loss: %.2f' % kl_loss_step)
-		print('    perplexity: %.2f' % np.exp(ppl_loss_step))
-		print('    kld: %.2f' % kld_step)
-		return loss_step, ppl_loss_step, kl_loss_step, kld_step, kl_weight_step
+		return loss_step, ppl_loss_step
 
 	def train_process(self, sess, data, args):
 		loss_step, time_step, epoch_step = np.zeros((1,)), .0, 0
-		ppl_loss_step, kl_loss_step, kld_step, kl_weight_step = 0, 0, 0, 0
+		ppl_loss_step = 0
 		previous_losses = [1e18] * 5
 		best_valid = 1e18
 		data.restart("train", batch_size=args.batch_size, shuffle=True)
@@ -196,32 +178,23 @@ class LMModel(object):
 						  % (epoch_step, self.global_step.eval(), self.learning_rate.eval(),
 							 time_step))
 					print('    loss: %.2f' % loss_step)
-					print('    kl_loss: %.2f' % kl_loss_step)
-					print('    perplexity: %.2f' % np.exp(ppl_loss_step))
-					print('    kld: %.2f' % kld_step)
 					self.trainSummary(self.global_step.eval() // args.checkpoint_steps,
 									  {'loss': loss_step,
 									   'perplexity': np.exp(ppl_loss_step),
-									   'kl_loss': kl_loss_step,
-									   'kld': kld_step,
-									   'kl_weight': kl_weight_step})
+									   })
 					#self.saver.save(sess, '%s/checkpoint_latest' % args.model_dir, global_step=self.global_step)\
 					self.store_checkpoint(sess, '%s/checkpoint_latest/checkpoint' % args.model_dir, "latest")
 
 					devout = self.evaluate(sess, data, args.batch_size, "dev")
 					self.devSummary(self.global_step.eval() // args.checkpoint_steps, {'loss': devout[0],
 																					   'perplexity': np.exp(devout[1]),
-																					   'kl_loss': devout[2],
-																					   'kld': devout[3],
-																					   'kl_weight': devout[4]})
+					})
 
 					testout = self.evaluate(sess, data, args.batch_size, "test")
 					self.testSummary(self.global_step.eval() // args.checkpoint_steps, {'loss': testout[0],
 																						'perplexity': np.exp(
 																							testout[1]),
-																						'kl_loss': testout[2],
-																						'kld': testout[3],
-																						'kl_weight': testout[4]})
+					})
 
 					if np.sum(loss_step) > max(previous_losses):
 						sess.run(self.learning_rate_decay_op)
@@ -231,15 +204,12 @@ class LMModel(object):
 
 					previous_losses = previous_losses[1:] + [np.sum(loss_step)]
 					loss_step, time_step = np.zeros((1,)), .0
-					ppl_loss_step, kl_loss_step, kld_step, kl_weight_step = 0, 0, 0, 0
+					ppl_loss_step = 0
 
 				start_time = time.time()
 				outputs = self.step_decoder(sess, batched_data)
 				loss_step += outputs[0] / args.checkpoint_steps
-				ppl_loss_step += outputs[-4] / args.checkpoint_steps
-				kl_loss_step += outputs[-3] / args.checkpoint_steps
-				kld_step += outputs[-2] / args.checkpoint_steps
-				kl_weight_step = outputs[-1]
+				ppl_loss_step += outputs[-1] / args.checkpoint_steps
 
 				time_step += (time.time() - start_time) / args.checkpoint_steps
 				batched_data = data.get_next_batch("train")
@@ -256,9 +226,9 @@ class LMModel(object):
 		while batched_data != None:
 			batched_responses_id = self.inference(sess, batched_data)[0]
 			gen_prob = self.step_decoder(sess, batched_data, forward_only=True)[1]
-			metric1_data = {'sentence': np.array(batched_data['sentence']),
-							'sentence_length': np.array(batched_data['sentence_length']),
-							'gen_prob': np.array(gen_prob)}
+			metric1_data = {'sent_allvocabs': np.array(batched_data['sent_allvocabs']),
+							'sent_length': np.array(batched_data['sent_length']),
+							'gen_log_prob': np.array(gen_prob)}
 			metric1.forward(metric1_data)
 			batch_results = []
 			for response_id in batched_responses_id:

@@ -62,9 +62,6 @@ def run():
 	args.softmax_samples = 512
 	args.embedding_size = 300
 	args.dh_size = 200
-	args.z_dim = 100
-	args.min_kl = 10
-	args.full_kl_step = 30000
 	args.lr = 1e-1
 	args.lr_decay = 0.995
 	args.momentum = 0.9
